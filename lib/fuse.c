@@ -56,6 +56,14 @@
 #include "guestfs-internal-actions.h"
 #include "structs-cleanups.h"
 
+__mode_t filter_mode(__mode_t);
+__mode_t filter_mode(__mode_t mode) {
+  if ((mode & S_IFMT) == S_IFBLK || (mode & S_IFMT) == S_IFCHR) {
+    mode = (mode & ~S_IFBLK & ~S_IFCHR) | S_IFREG;
+  }
+  return mode;
+}
+
 #if HAVE_FUSE
 
 /* Functions handling the directory cache. */
@@ -160,6 +168,7 @@ mount_local_readdir (const char *path, void *buf, fuse_fill_dir_t filler,
     case '?':
     default:  stat.st_mode = 0;
     }
+    stat.st_mode = filter_mode(stat.st_mode);
 
     /* Copied from the example, which also ignores 'offset'.  I'm
      * not quite sure how this is ever supposed to work on large
@@ -191,7 +200,7 @@ mount_local_readdir (const char *path, void *buf, fuse_fill_dir_t filler,
           memset (&statbuf, 0, sizeof statbuf);
           statbuf.st_dev = ss->val[i].st_dev;
           statbuf.st_ino = ss->val[i].st_ino;
-          statbuf.st_mode = ss->val[i].st_mode;
+          statbuf.st_mode = filter_mode(ss->val[i].st_mode);
           statbuf.st_nlink = ss->val[i].st_nlink;
           statbuf.st_uid = ss->val[i].st_uid;
           statbuf.st_gid = ss->val[i].st_gid;
@@ -281,7 +290,7 @@ mount_local_getattr (const char *path, struct stat *statbuf)
   memset (statbuf, 0, sizeof *statbuf);
   statbuf->st_dev = r->st_dev;
   statbuf->st_ino = r->st_ino;
-  statbuf->st_mode = r->st_mode;
+  statbuf->st_mode = filter_mode(r->st_mode);
   statbuf->st_nlink = r->st_nlink;
   statbuf->st_uid = r->st_uid;
   statbuf->st_gid = r->st_gid;

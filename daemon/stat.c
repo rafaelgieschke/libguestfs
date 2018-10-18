@@ -30,6 +30,17 @@
 #include "daemon.h"
 #include "actions.h"
 
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+
+__mode_t filter_mode(__mode_t);
+__mode_t filter_mode(__mode_t mode) {
+  if ((mode & S_IFMT) == S_IFBLK || (mode & S_IFMT) == S_IFCHR) {
+    mode = (mode & ~S_IFBLK & ~S_IFCHR) | S_IFREG;
+  }
+  return mode;
+}
+
 static guestfs_int_statns *
 stat_to_statns (guestfs_int_statns *ret, const struct stat *statbuf)
 {
@@ -92,6 +103,11 @@ do_statns (const char *path)
 
   CHROOT_IN;
   r = stat (path, &statbuf);
+  if (r != -1 && (statbuf.st_mode != filter_mode(statbuf.st_mode))) {
+    int fd = open(path, O_RDONLY);
+    ioctl(fd, BLKGETSIZE64, &statbuf.st_size);
+    close(fd);
+  }
   CHROOT_OUT;
 
   if (r == -1) {
@@ -110,6 +126,11 @@ do_lstatns (const char *path)
 
   CHROOT_IN;
   r = lstat (path, &statbuf);
+  if (r != -1 && (statbuf.st_mode != filter_mode(statbuf.st_mode))) {
+    int fd = open(path, O_RDONLY);
+    ioctl(fd, BLKGETSIZE64, &statbuf.st_size);
+    close(fd);
+  }
   CHROOT_OUT;
 
   if (r == -1) {
@@ -159,6 +180,11 @@ do_internal_lstatnslist (const char *path, char *const *names)
     struct stat statbuf;
 
     r = fstatat (path_fd, names[i], &statbuf, AT_SYMLINK_NOFOLLOW);
+    if (r != -1 && (statbuf.st_mode != filter_mode(statbuf.st_mode))) {
+      int fd = openat(path_fd, names[i], O_RDONLY);
+      ioctl(fd, BLKGETSIZE64, &statbuf.st_size);
+      close(fd);
+    }
     if (r == -1)
       ret->guestfs_int_statns_list_val[i].st_ino = -1;
     else

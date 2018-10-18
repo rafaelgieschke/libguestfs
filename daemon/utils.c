@@ -120,6 +120,7 @@ is_device_parameter (const char *device)
 
   if (!STRPREFIX (device, "/dev/"))
     return 0;
+  return 1;
 
   /* Allow any /dev/sd device, so device name translation works. */
   if (STRPREFIX (device, "/dev/sd"))
